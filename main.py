@@ -4,11 +4,12 @@ import streamlit as st
 
 # 페이지 기본 설정 (타이틀, 레이아웃)
 st.set_page_config(
-    page_title="어제 박스오피스 순위", page_icon="🎬", layout="wide"
+    page_title="박스오피스 순위 조회", page_icon="🎬", layout="wide"
 )
 
 
 # API 데이터를 불러오고 1시간(3600초)동안 캐싱(기억)하는 함수
+# 선택한 target_date마다 별도로 결과가 기억됩니다.
 @st.cache_data(ttl=3600)
 def fetch_box_office_data(api_key, target_date):
     """KOBIS API를 호출하여 dailyBoxOfficeList 데이터를 반환합니다."""
@@ -25,8 +26,23 @@ def fetch_box_office_data(api_key, target_date):
         return None
 
 
+def format_rank_change(rank_inten):
+    """순위 증감 수치를 화살표 기호가 붙은 문자열로 변환합니다."""
+    try:
+        change = int(rank_inten)
+    except ValueError:
+        return "-"
+
+    if change > 0:
+        return f"🔺 {change}"  # 순위 상승 (빨간 위 화살표)
+    elif change < 0:
+        return f"🔹 {abs(change)}"  # 순위 하강 (파란 아래 화살표)
+    else:
+        return "-"  # 변동 없음
+
+
 def main():
-    st.title("🎬 어제 박스오피스 순위")
+    st.title("🎬 박스오피스 순위 조회")
 
     # 1. Streamlit Secrets에서 API Key 가져오기
     if "KOBIS_KEY" not in st.secrets:
@@ -38,19 +54,29 @@ def main():
 
     api_key = st.secrets["KOBIS_KEY"]
 
-    # 2. 한국 시간(UTC+9) 기준 어제 날짜 계산 (YYYYMMDD 형식)
-    # 서버 시계 시간대에 관계없이 UTC+9 시차 적용
+    # 2. 한국 시간(UTC+9) 기준 어제 날짜 계산 (달력의 최대 선택 가능 날짜)
     korea_tz = datetime.timezone(datetime.timedelta(hours=9))
-    yesterday = datetime.datetime.now(korea_tz) - datetime.timedelta(days=1)
-    target_date_str = yesterday.strftime("%Y%m%d")
-    display_date_str = yesterday.strftime("%Y년 %m월 %d일")
+    today_korea = datetime.datetime.now(korea_tz).date()
+    yesterday = today_korea - datetime.timedelta(days=1)
+
+    # 3. 달력을 통해 조회할 날짜 선택
+    selected_date = st.date_input(
+        label="📅 조회할 날짜를 선택해 주세요",
+        value=yesterday,
+        max_value=yesterday,  # 오늘 이후 날짜는 선택 불가능
+        help="오늘 날짜는 아직 데이터 집계 전이므로 어제 날짜까지만 선택 가능합니다."
+    )
+
+    # API에 전달할 YYYYMMDD 형태 문자열 생성
+    target_date_str = selected_date.strftime("%Y%m%d")
+    display_date_str = selected_date.strftime("%Y년 %m월 %d일")
 
     st.write(f" 기준 날짜: **{display_date_str}**")
 
-    # 3. API 호출
+    # 4. API 호출
     data = fetch_box_office_data(api_key, target_date_str)
 
-    # 4. 예외 및 오류 처리 (요청 실패 / faultInfo / 빈 목록)
+    # 5. 예외 및 오류 처리 (요청 실패 / faultInfo / 빈 목록)
     if data is None:
         st.error(
             "❌ 네트워크 연결에 실패했거나 KOBIS 서버 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요."
@@ -72,30 +98,35 @@ def main():
     daily_list = box_office_result.get("dailyBoxOfficeList", [])
 
     if not daily_list:
-        st.warning(
-            "⚠️ 해당 날짜의 박스오피스 데이터가 비어 있습니다. 아직 집계가 완료되지 않았거나 데이터가 없을 수 있습니다."
-        )
+        st.warning("⚠️ 그날은 아직 집계 전입니다.")
         return
 
-    # 5. 숫자 데이터 형변환 (문자열 -> 정수)
+    # 6. 숫자 데이터 형변환 및 영화명/순위증감 가공
     parsed_list = []
     for item in daily_list:
+        movie_name = item.get("movieNm", "")
+        audi_acc = int(item.get("audiAcc", 0))
+
+        # 누적 관객 100만 명 이상일 경우 영화명에 트로피 이모지 붙이기
+        if audi_acc >= 1000000:
+            movie_name = f"🏆 {movie_name}"
+
         parsed_list.append(
             {
                 "순위": int(item.get("rank", 0)),
-                "영화명": item.get("movieNm", ""),
+                "영화명": movie_name,
                 "개봉일": item.get("openDt", ""),
                 "관객수": int(item.get("audiCnt", 0)),
-                "누적관객": int(item.get("audiAcc", 0)),
+                "누적관객": audi_acc,
                 "스크린수": int(item.get("scrnCnt", 0)),
-                "순위증감": item.get("rankInten", "0"),
+                "순위증감": format_rank_change(item.get("rankInten", "0")),
             }
         )
 
     # 순위 기준으로 정렬
     parsed_list.sort(key=lambda x: x["순위"])
 
-    # 6. 1위 영화 지표 카드 3장 표시
+    # 7. 1위 영화 지표 카드 3장 표시
     top1 = parsed_list[0]
     st.markdown("### 🏆 1위 영화 상세 정보")
 
@@ -104,7 +135,7 @@ def main():
         st.metric(label="1위 영화 제목", value=top1["영화명"])
     with col2:
         st.metric(
-            label="어제 관객수", value=f"{top1['관객수']:,} 명"
+            label="당일 관객수", value=f"{top1['관객수']:,} 명"
         )
     with col3:
         st.metric(
@@ -113,11 +144,10 @@ def main():
 
     st.divider()
 
-    # 7. 상위 5편 관객수 막대그래프
+    # 8. 상위 5편 관객수 막대그래프
     st.markdown("### 📊 관객수 상위 5개 영화")
     top5_list = parsed_list[:5]
 
-    # Streamlit 기본 차트 사용을 위한 데이터 가공 (영화명: 관객수)
     chart_data = {
         item["영화명"]: item["관객수"] for item in top5_list
     }
@@ -125,15 +155,15 @@ def main():
 
     st.divider()
 
-    # 8. 전체 박스오피스 표 출력
+    # 9. 전체 박스오피스 표 출력
     st.markdown("### 📋 박스오피스 전체 순위")
 
-    # 표에 보여줄 열 정리
     table_data = []
     for item in parsed_list:
         table_data.append(
             {
                 "순위": item["순위"],
+                "순위 변동": item["순위증감"],
                 "영화명": item["영화명"],
                 "개봉일": item["개봉일"],
                 "일일 관객수": f"{item['관객수']:,}명",
