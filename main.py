@@ -225,3 +225,52 @@ st.plotly_chart(fig5, use_container_width=True)
 
 # 알 수 있는 것 문구
 st.info("💡 **이 그래프로 알 수 있는 것:** 월별 총 관객 수의 변화를 통해 극장가의 계절적 성수기(방학, 연말연시, 추석 등)와 비수기 시즌을 한눈에 비교 및 파악할 수 있습니다.")
+
+st.markdown("---")
+
+# --------------------------------------------------
+# [구역 6] 히트맵 - 월×요일별 일관객수 합계
+# --------------------------------------------------
+st.subheader("6. 월×요일별 관객수 히트맵")
+
+# 1. 날짜 데이터에서 월과 요일 추출
+heatmap_df = daily_total.copy()
+heatmap_df["월"] = heatmap_df["기준일자"].dt.strftime("%Y-%m")
+heatmap_df["요일명"] = heatmap_df["기준일자"].dt.day_name() # English 요일 추출
+heatmap_df["날짜문자열"] = heatmap_df["기준일자"].dt.strftime("%Y-%m-%d")
+
+# 요일 한글 매핑 및 월요일~일요일 정렬 순서 지정
+day_map = {
+    "Monday": "월요일", "Tuesday": "화요일", "Wednesday": "수요일",
+    "Thursday": "목요일", "Friday": "금요일", "Saturday": "토요일", "Sunday": "일요일"
+}
+heatmap_df["요일"] = heatmap_df["요일명"].map(day_map)
+
+# 요일 순서 고정 (월요일 ~ 일요일)
+day_order = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+
+# 2. Plotly density_heatmap을 활용하여 월(X축) × 요일(Y축) 히트맵 생성
+fig6 = px.density_heatmap(
+    heatmap_df,
+    x="월",
+    y="요일",
+    z="해당일관객수",
+    histfunc="sum", # 관객수 합계 계산
+    category_orders={"요일": day_order}, # 요일 순서 지정
+    color_continuous_scale="Viridis", # 진할수록 큰 값을 가지는 컬러맵
+    title="월 및 요일별 전체 관객수 합계 히트맵",
+    labels={"월": "월(연-월)", "요일": "요일", "해당일관객수": "관객수(명)"},
+    hover_data={"날짜문자열": True, "해당일관객수": ":,명"} # 마우스 올렸을 때 yyyy-mm-dd 및 정확한 관객수 표시
+)
+
+# 축 레이아웃 정돈
+fig6.update_layout(
+    xaxis_type="category",
+    yaxis=dict(autorange="reversed") # 월요일이 맨 위에 오도록 축 방향 설정
+)
+
+# 그래프 화면 출력
+st.plotly_chart(fig6, use_container_width=True)
+
+# 알 수 있는 것 문구
+st.info("💡 **이 그래프로 알 수 있는 것:** 연중 각 월별로 평일과 주말(토/일) 간 관객수 집적도의 차이를 패턴화하여 볼 수 있으며, 특정 월의 주말 집중 현상을 직관적으로 확인할 수 있습니다.")
