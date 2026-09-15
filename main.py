@@ -156,13 +156,12 @@ st.subheader("4. 전체 박스오피스 일별 총 관객수 및 7일 이동평�
 # 1. 기준일자별 TOP10 영화의 해당일관객수 총합 계산
 daily_total = df.groupby("기준일자")["해당일관객수"].sum().reset_index()
 
-# 2. 7일 이동평균(Rolling Mean) 계산 (최소 1일 이상 데이터가 있으면 계산)
+# 2. 7일 이동평균(Rolling Mean) 계산
 daily_total["7일이동평균"] = daily_total["해당일관객수"].rolling(window=7, min_periods=1).mean()
 
-# 3. Plotly graph_objects를 이용해 원본 선과 이동평균 선을 하나의 그래프에 시각화
+# 3. Plotly graph_objects를 이용해 원본 선과 이동평균 선 시각화
 fig4 = go.Figure()
 
-# (1) 원본 일별 총 관객수 선 (연하게 표현: lightgray, 투명도 조정)
 fig4.add_trace(
     go.Scatter(
         x=daily_total["기준일자"],
@@ -173,7 +172,6 @@ fig4.add_trace(
     )
 )
 
-# (2) 7일 이동평균 선 (진하게 표현: royalblue, 굵은 선)
 fig4.add_trace(
     go.Scatter(
         x=daily_total["기준일자"],
@@ -184,7 +182,6 @@ fig4.add_trace(
     )
 )
 
-# 그래프 레이아웃 및 축 설정
 fig4.update_layout(
     title="전체 박스오피스 일별 총 관객수 추이 및 7일 이동평균선",
     xaxis_title="날짜",
@@ -192,8 +189,39 @@ fig4.update_layout(
     legend=dict(x=0, y=1.1, orientation="h")
 )
 
-# 그래프 화면 출력
 st.plotly_chart(fig4, use_container_width=True)
 
-# 알 수 있는 것 문구
 st.info("💡 **이 그래프로 알 수 있는 것:** 주말/평일 간의 격차로 인한 단기적인 일별 관객수 변동(연한 선)을 완화하고, 7일 이동평균선(진한 선)을 통해 극장가 전체 관객수 흐름의 중장기적인 상승 및 하락 트렌드를 명확하게 파악할 수 있습니다.")
+
+st.markdown("---")
+
+# --------------------------------------------------
+# [구역 5] 막대그래프 - 월별 전체 관객수 합계
+# --------------------------------------------------
+st.subheader("5. 월별 전체 박스오피스 관객수 합계")
+
+# 1. 기준일자에서 '연-월(YYYY-MM)' 형식의 컬럼 생성
+daily_total["연월"] = daily_total["기준일자"].dt.strftime("%Y-%m")
+
+# 2. 월 단위로 그룹화하여 해당일관객수의 총합 계산
+monthly_total = daily_total.groupby("연월")["해당일관객수"].sum().reset_index()
+
+# 3. Plotly 막대그래프 생성
+fig5 = px.bar(
+    monthly_total,
+    x="연월",
+    y="해당일관객수",
+    title="월별 극장가 전체 관객수 합계",
+    text_auto=".2s", # 막대 위에 숫자를 간략하게 표시 (예: 1.2M)
+    labels={"연월": "월(연-월)", "해당일관객수": "총 관객수(명)"}
+)
+
+# 막대 색상 및 레이아웃 설정
+fig5.update_traces(marker_color="teal")
+fig5.update_layout(xaxis_type="category") # 연월 라벨이 뭉개지지 않도록 범주형 축으로 설정
+
+# 그래프 화면 출력
+st.plotly_chart(fig5, use_container_width=True)
+
+# 알 수 있는 것 문구
+st.info("💡 **이 그래프로 알 수 있는 것:** 월별 총 관객 수의 변화를 통해 극장가의 계절적 성수기(방학, 연말연시, 추석 등)와 비수기 시즌을 한눈에 비교 및 파악할 수 있습니다.")
