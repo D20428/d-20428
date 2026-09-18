@@ -1,7 +1,6 @@
 # main.py
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 # 페이지 설정
@@ -15,8 +14,8 @@ def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
     
-    # genre: 세로막대 기호(|)로 여러 개 적힌 경우 첫 번째 장르만 추출
-    df['genre'] = df['genre'].astype(str).apply(lambda x: x.split('|')[0].strip())
+    # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출 (Pandas str 메서드 사용)
+    df['genre'] = df['genre'].astype(str).str.split('|').str[0].str.strip()
     return df
 
 df = load_data()
@@ -52,7 +51,7 @@ st.info("**이 그래프로 알 수 있는 것:** 개봉한 영화 중 어떤 �
 st.divider()
 
 # ----------------------------------------------------
-# 추가 분석 그래프 (예시: 스크린수와 총 관객수 관계)
+# 두 번째 그래프: 개봉일 스크린수와 총 관객수 관계
 # ----------------------------------------------------
 st.subheader("2. 개봉일 스크린수와 총 관객수 관계")
 
