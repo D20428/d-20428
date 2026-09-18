@@ -14,7 +14,7 @@ def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
     
-    # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출 (Pandas str 메서드 사용)
+    # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출
     df['genre'] = df['genre'].astype(str).str.split('|').str[0].str.strip()
     return df
 
@@ -51,22 +51,23 @@ st.info("**이 그래프로 알 수 있는 것:** 개봉한 영화 중 어떤 �
 st.divider()
 
 # ----------------------------------------------------
-# 두 번째 그래프: 장르별 영화 점유율 트리맵 (칸 크기: 총 관객수)
+# 두 번째 그래프: 장르 및 영화별 총 관객수 분포 (트리맵)
 # ----------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
-# 트리맵 생성 (path 구조 단순화)
+# 중복 방지를 위해 path에 고유 식별자인 movieCd 추가
 fig_treemap = px.treemap(
     df,
-    path=['genre', 'movieNm'],  # 계층 구조: 장르 -> 영화명
+    path=['genre', 'movieCd'],
     values='total_audi',
     color='genre',
+    hover_data={'movieNm': True, 'movieCd': False},
     title="장르 및 영화별 총 관객수 트리맵"
 )
 
-# 마우스 호버 시 영화명과 총 관객수 표기 설정
+# 마우스 호버 시 영화명과 총 관객수가 표기되도록 연동
 fig_treemap.update_traces(
-    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,.0f}명"
+    hovertemplate="<b>%{customdata[0]}</b><br>총 관객수: %{value:,.0f}명"
 )
 
 st.plotly_chart(fig_treemap, use_container_width=True)
