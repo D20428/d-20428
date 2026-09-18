@@ -17,6 +17,11 @@ def load_data():
     
     # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출
     df['genre'] = df['genre'].astype(str).str.split('|').str[0].str.strip()
+    
+    # 숫자형 컬럼 변환 및 결측치/음수 처리 (0 이하 값 제외)
+    df['total_audi'] = pd.to_numeric(df['total_audi'], errors='coerce').fillna(0)
+    df = df[df['total_audi'] > 0]
+    
     return df
 
 df = load_data()
@@ -50,31 +55,39 @@ st.info("**이 그래프로 알 수 있는 것:** 개봉한 영화 중 어떤 �
 st.divider()
 
 # ----------------------------------------------------
-# 두 번째 그래프: 장르 및 영화별 총 관객수 분포 (go.Treemap 활용)
+# 두 번째 그래프: 장르 및 영화별 총 관객수 분포 (트리맵)
 # ----------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
-# 1. 고유한 노드 ID 조성을 위한 데이터 구조화
+# 데이터 가공
+# 1. 영화 데이터 정제 (장르 + 영화명 기준 관객수 합계)
+movie_summary = df.groupby(['genre', 'movieCd', 'movieNm'], as_index=False)['total_audi'].sum()
+
+# 2. 장르별 관객수 합계 계산
+genre_summary = movie_summary.groupby('genre', as_index=False)['total_audi'].sum()
+
+# 3. 트리맵 노드 생성
+# 루트 노드
+ids = ["All"]
+labels = ["전체 영화"]
+parents = [""]
+values = [genre_summary['total_audi'].sum()]
+
 # 장르 노드
-genres = df['genre'].unique()
-genre_parents = [""] * len(genres)
-genre_values = [df[df['genre'] == g]['total_audi'].sum() for g in genres]
-genre_labels = genres
-genre_ids = [f"genre_{g}" for g in genres]
+for _, row in genre_summary.iterrows():
+    ids.append(f"genre_{row['genre']}")
+    labels.append(row['genre'])
+    parents.append("All")
+    values.append(row['total_audi'])
 
-# 영화 노드 (movieCd를 ID로 사용하여 제목 중복 완전 차단)
-movie_ids = [f"movie_{row['movieCd']}" for _, row in df.iterrows()]
-movie_labels = df['movieNm'].tolist()
-movie_parents = [f"genre_{g}" for g in df['genre']]
-movie_values = df['total_audi'].tolist()
+# 영화 노드
+for _, row in movie_summary.iterrows():
+    ids.append(f"movie_{row['movieCd']}")
+    labels.append(row['movieNm'])
+    parents.append(f"genre_{row['genre']}")
+    values.append(row['total_audi'])
 
-# 전체 트리의 노드 합치기
-ids = genre_ids + movie_ids
-labels = list(genre_labels) + movie_labels
-parents = genre_parents + movie_parents
-values = genre_values + movie_values
-
-# 2. go.Treemap 생성
+# 4. go.Treemap 생성
 fig_treemap = go.Figure(go.Treemap(
     ids=ids,
     labels=labels,
