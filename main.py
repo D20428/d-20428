@@ -60,34 +60,27 @@ st.divider()
 st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
 # 데이터 가공
-# 1. 영화 데이터 정제 (장르 + 영화명 기준 관객수 합계)
 movie_summary = df.groupby(['genre', 'movieCd', 'movieNm'], as_index=False)['total_audi'].sum()
-
-# 2. 장르별 관객수 합계 계산
 genre_summary = movie_summary.groupby('genre', as_index=False)['total_audi'].sum()
 
-# 3. 트리맵 노드 생성
-# 루트 노드
+# 트리맵 노드 생성
 ids = ["All"]
 labels = ["전체 영화"]
 parents = [""]
 values = [genre_summary['total_audi'].sum()]
 
-# 장르 노드
 for _, row in genre_summary.iterrows():
     ids.append(f"genre_{row['genre']}")
     labels.append(row['genre'])
     parents.append("All")
     values.append(row['total_audi'])
 
-# 영화 노드
 for _, row in movie_summary.iterrows():
     ids.append(f"movie_{row['movieCd']}")
     labels.append(row['movieNm'])
     parents.append(f"genre_{row['genre']}")
     values.append(row['total_audi'])
 
-# 4. go.Treemap 생성
 fig_treemap = go.Figure(go.Treemap(
     ids=ids,
     labels=labels,
@@ -105,3 +98,41 @@ fig_treemap.update_layout(
 st.plotly_chart(fig_treemap, use_container_width=True)
 
 st.info("**이 그래프로 알 수 있는 것:** 특정 장르 내에서 어떤 영화가 가장 많은 관객을 모았는지, 전체 총 관객수에서 차지하는 비중을 직관적으로 비교할 수 있습니다.")
+
+st.divider()
+
+# ----------------------------------------------------
+# 세 번째 그래프: 총 관객수 히스토그램
+# ----------------------------------------------------
+st.subheader("3. 총 관객수 히스토그램")
+
+fig_hist = px.histogram(
+    df,
+    x='total_audi',
+    nbins=30,
+    title="총 관객수 분포 히스토그램",
+    labels={'total_audi': '총 관객수'},
+    color_discrete_sequence=['#636EFA']
+)
+
+fig_hist.update_traces(
+    hovertemplate="관객수 구간: %{x}<br>영화 수: %{y}편"
+)
+
+fig_hist.update_layout(
+    xaxis_title="총 관객수 (명)",
+    yaxis_title="영화 수 (편)"
+)
+
+st.plotly_chart(fig_hist, use_container_width=True)
+
+# 가장 관객수가 많은 영화 정보 계산
+top_movie = df.loc[df['total_audi'].idxmax()]
+top_movie_name = top_movie['movieNm']
+top_movie_audi = top_movie['total_audi']
+
+# 그래프 설명 구역
+st.info(
+    f"**이 그래프로 알 수 있는 것:** 대부분의 영화는 관객수 **500만 명 이하(주로 100만~300만 명) 구간**에 밀집해 있으며, "
+    f"가장 많은 관객을 모은 영화는 **'{top_movie_name}'** (약 {top_movie_audi:,.0f}명)입니다."
+)
