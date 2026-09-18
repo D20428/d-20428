@@ -16,6 +16,10 @@ def load_data():
     
     # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출
     df['genre'] = df['genre'].astype(str).str.split('|').str[0].str.strip()
+    
+    # 트리맵 중복 방지 및 표시용 레이블 컬럼 생성 (영화명)
+    df['movie_label'] = df['movieNm']
+    
     return df
 
 df = load_data()
@@ -55,19 +59,19 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
-# 중복 방지를 위해 path에 고유 식별자인 movieCd 추가
+# 트리맵 생성
 fig_treemap = px.treemap(
     df,
-    path=['genre', 'movieCd'],
+    path=[px.Constant("전체 영화"), 'genre', 'movie_label'],
     values='total_audi',
     color='genre',
-    hover_data={'movieNm': True, 'movieCd': False},
+    hover_data={'total_audi': ':,f'},
     title="장르 및 영화별 총 관객수 트리맵"
 )
 
-# 마우스 호버 시 영화명과 총 관객수가 표기되도록 연동
+# 마우스 호버 시 라벨과 총 관객수가 깔끔하게 표시되도록 설정
 fig_treemap.update_traces(
-    hovertemplate="<b>%{customdata[0]}</b><br>총 관객수: %{value:,.0f}명"
+    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,.0f}명"
 )
 
 st.plotly_chart(fig_treemap, use_container_width=True)
