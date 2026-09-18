@@ -51,21 +51,24 @@ st.info("**이 그래프로 알 수 있는 것:** 개봉한 영화 중 어떤 �
 st.divider()
 
 # ----------------------------------------------------
-# 두 번째 그래프: 개봉일 스크린수와 총 관객수 관계
+# 두 번째 그래프: 장르별 영화 점유율 트리맵 (칸 크기: 총 관객수)
 # ----------------------------------------------------
-st.subheader("2. 개봉일 스크린수와 총 관객수 관계")
+st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
-fig_scatter = px.scatter(
+fig_treemap = px.treemap(
     df,
-    x='first_scrn',
-    y='total_audi',
+    path=[px.Constant("전체"), 'genre', 'movieNm'],  # 계층 구조: 전체 -> 장르 -> 영화명
+    values='total_audi',
     color='genre',
-    hover_data=['movieNm'],
-    labels={'first_scrn': '개봉일 스크린수', 'total_audi': '총 관객수'},
-    title="개봉일 스크린수 vs 총 관객수"
+    title="장르 및 영화별 총 관객수 트리맵"
 )
 
-st.plotly_chart(fig_scatter, use_container_width=True)
+# 마우스 호버 시 영화명과 총 관객수 표기 설정
+fig_treemap.update_traces(
+    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,.0f}명"
+)
+
+st.plotly_chart(fig_treemap, use_container_width=True)
 
 # 그래프 설명 구역
-st.info("**이 그래프로 알 수 있는 것:** 개봉 당일 확보한 스크린수가 많을수록 최종 총 관객수도 증가하는 경향이 있는지 확인할 수 있습니다.")
+st.info("**이 그래프로 알 수 있는 것:** 특정 장르 내에서 어떤 영화가 가장 많은 관객을 모았는지, 전체 총 관객수에서 차지하는 비중을 직관적으로 비교할 수 있습니다.")
