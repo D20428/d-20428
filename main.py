@@ -55,9 +55,10 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
+# 트리맵 생성 (path 구조 단순화)
 fig_treemap = px.treemap(
     df,
-    path=[px.Constant("전체"), 'genre', 'movieNm'],  # 계층 구조: 전체 -> 장르 -> 영화명
+    path=['genre', 'movieNm'],  # 계층 구조: 장르 -> 영화명
     values='total_audi',
     color='genre',
     title="장르 및 영화별 총 관객수 트리맵"
