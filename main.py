@@ -18,6 +18,13 @@ def load_data():
     # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출
     df['genre'] = df['genre'].astype(str).str.split('|').str[0].str.strip()
     
+    # nation: 세로막대 기호(|) 기준 첫 번째 국가만 추출 및 결측치 처리
+    if 'nation' in df.columns:
+        df['nation'] = df['nation'].astype(str).str.split('|').str[0].str.strip()
+        df['nation'] = df['nation'].replace({'nan': '기타', '': '기타'})
+    else:
+        df['nation'] = '기타'
+    
     # 숫자형 컬럼 변환 (오류 문자열은 NaN 처리 후 0으로 대체)
     for col in ['total_audi', 'first_scrn', 'first_week_audi']:
         if col in df.columns:
@@ -214,9 +221,7 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("6. 개봉일 스크린수, 총 관객수, 첫 주 관객수 관계 (버블 차트)")
 
-# 버블 차트용 데이터 필터링 (첫 주 관객수 결측 처리)
 df_bubble = df.copy()
-df_bubble['custom_hover'] = df_bubble['first_week_audi'].apply(lambda x: f"{x:,.0f}명")
 
 fig_bubble = px.scatter(
     df_bubble,
@@ -243,3 +248,29 @@ fig_bubble.update_traces(
 st.plotly_chart(fig_bubble, use_container_width=True)
 
 st.info("**이 그래프로 알 수 있는 것:** 버블의 크기가 클수록 개봉 첫 주 관객수가 많았던 영화로, 스크린수 및 초반 관객 동원력이 최종 흥행(총 관객수)에 미치는 파급력을 한눈에 입체적으로 비교할 수 있습니다.")
+
+st.divider()
+
+# ----------------------------------------------------
+# 일곱 번째 그래프: 제작 국가 -> 장르 계층 구조 (선버스트 차트)
+# ----------------------------------------------------
+st.subheader("7. 제작 국가 및 장르별 영화 편수 (선버스트 차트)")
+
+# 국가 x 장르별 영화 편수 집계
+sunburst_df = df.groupby(['nation', 'genre']).size().reset_index(name='movie_count')
+
+fig_sunburst = px.sunburst(
+    sunburst_df,
+    path=['nation', 'genre'],
+    values='movie_count',
+    title="제작 국가별 장르 구성 및 영화 편수",
+    color='nation'
+)
+
+fig_sunburst.update_traces(
+    hovertemplate="<b>%{label}</b><br>영화 편수: %{value}편<br>상위 항목 대비 비중: %{percentParent:.1%}<br>전체 대비 비중: %{percentRoot:.1%}<extra></extra>"
+)
+
+st.plotly_chart(fig_sunburst, use_container_width=True)
+
+st.info("**이 그래프로 알 수 있는 것:** 안쪽 고리의 국가를 클릭하면 해당 국가에서 제작된 장르별 영화 편수와 비중을 상세하게 탐색할 수 있습니다.")
