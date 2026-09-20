@@ -18,11 +18,15 @@ def load_data():
     # genre: 세로막대 기호(|) 기준 첫 번째 장르만 추출
     df['genre'] = df['genre'].astype(str).str.split('|').str[0].str.strip()
     
-    # 숫자형 컬럼 변환 및 결측치/음수 처리 (0 이하 값 제외)
-    df['total_audi'] = pd.to_numeric(df['total_audi'], errors='coerce').fillna(0)
-    df['first_scrn'] = pd.to_numeric(df['first_scrn'], errors='coerce').fillna(0)
-    df['first_week_audi'] = pd.to_numeric(df['first_week_audi'], errors='coerce').fillna(0)
-    df = df[df['total_audi'] > 0]
+    # 숫자형 컬럼 변환 (오류 문자열은 NaN 처리 후 0으로 대체)
+    for col in ['total_audi', 'first_scrn', 'first_week_audi']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        else:
+            df[col] = 0
+            
+    # 관객수가 0 이하인 행 제거
+    df = df[df['total_audi'] > 0].copy()
     
     return df
 
@@ -61,11 +65,9 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
 
-# 데이터 가공
 movie_summary = df.groupby(['genre', 'movieCd', 'movieNm'], as_index=False)['total_audi'].sum()
 genre_summary = movie_summary.groupby('genre', as_index=False)['total_audi'].sum()
 
-# 트리맵 노드 생성
 ids = ["All"]
 labels = ["전체 영화"]
 parents = [""]
@@ -128,7 +130,6 @@ fig_hist.update_layout(
 
 st.plotly_chart(fig_hist, use_container_width=True)
 
-# 가장 관객수가 많은 영화 정보 계산
 top_movie = df.loc[df['total_audi'].idxmax()]
 top_movie_name = top_movie['movieNm']
 top_movie_audi = top_movie['total_audi']
@@ -174,7 +175,6 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("5. 주요 장르별 총 관객수 박스플롯")
 
-# 영화가 10편 이상인 장르만 필터링
 genre_counts_series = df['genre'].value_counts()
 major_genres = genre_counts_series[genre_counts_series >= 10].index.tolist()
 df_filtered_box = df[df['genre'].isin(major_genres)]
@@ -214,14 +214,19 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("6. 개봉일 스크린수, 총 관객수, 첫 주 관객수 관계 (버블 차트)")
 
+# 버블 차트용 데이터 필터링 (첫 주 관객수 결측 처리)
+df_bubble = df.copy()
+df_bubble['custom_hover'] = df_bubble['first_week_audi'].apply(lambda x: f"{x:,.0f}명")
+
 fig_bubble = px.scatter(
-    df,
+    df_bubble,
     x='first_scrn',
     y='total_audi',
     size='first_week_audi',
     color='genre',
     hover_name='movieNm',
-    size_max=50,
+    custom_data=['first_week_audi'],
+    size_max=40,
     labels={
         'first_scrn': '개봉일 스크린수 (개)',
         'total_audi': '총 관객수 (명)',
@@ -232,7 +237,7 @@ fig_bubble = px.scatter(
 )
 
 fig_bubble.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<br>첫 주 관객수: %{marker.size:,.0f}명<extra></extra>"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<br>첫 주 관객수: %{customdata[0]:,.0f}명<extra></extra>"
 )
 
 st.plotly_chart(fig_bubble, use_container_width=True)
