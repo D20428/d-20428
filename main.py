@@ -20,6 +20,7 @@ def load_data():
     
     # 숫자형 컬럼 변환 및 결측치/음수 처리 (0 이하 값 제외)
     df['total_audi'] = pd.to_numeric(df['total_audi'], errors='coerce').fillna(0)
+    df['first_scrn'] = pd.to_numeric(df['first_scrn'], errors='coerce').fillna(0)
     df = df[df['total_audi'] > 0]
     
     return df
@@ -131,8 +132,36 @@ top_movie = df.loc[df['total_audi'].idxmax()]
 top_movie_name = top_movie['movieNm']
 top_movie_audi = top_movie['total_audi']
 
-# 그래프 설명 구역
 st.info(
     f"**이 그래프로 알 수 있는 것:** 대부분의 영화는 관객수 **500만 명 이하(주로 100만~300만 명) 구간**에 밀집해 있으며, "
     f"가장 많은 관객을 모은 영화는 **'{top_movie_name}'** (약 {top_movie_audi:,.0f}명)입니다."
 )
+
+st.divider()
+
+# ----------------------------------------------------
+# 네 번째 그래프: 개봉일 스크린수 vs 총 관객수 산점도
+# ----------------------------------------------------
+st.subheader("4. 개봉일 스크린수와 총 관객수 관계")
+
+fig_scatter = px.scatter(
+    df,
+    x='first_scrn',
+    y='total_audi',
+    color='genre',
+    hover_name='movieNm',
+    labels={
+        'first_scrn': '개봉일 스크린수 (개)',
+        'total_audi': '총 관객수 (명)',
+        'genre': '장르'
+    },
+    title="개봉일 스크린수 vs 총 관객수 산점도"
+)
+
+fig_scatter.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<extra></extra>"
+)
+
+st.plotly_chart(fig_scatter, use_container_width=True)
+
+st.info("**이 그래프로 알 수 있는 것:** 개봉 당일 확보한 스크린수가 많을수록 대체로 최종 총 관객수도 높게 형성되는 양의 관계가 있음을 알 수 있습니다.")
