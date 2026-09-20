@@ -165,3 +165,43 @@ fig_scatter.update_traces(
 st.plotly_chart(fig_scatter, use_container_width=True)
 
 st.info("**이 그래프로 알 수 있는 것:** 개봉 당일 확보한 스크린수가 많을수록 대체로 최종 총 관객수도 높게 형성되는 양의 관계가 있음을 알 수 있습니다.")
+
+st.divider()
+
+# ----------------------------------------------------
+# 다섯 번째 그래프: 영화 10편 이상 장르별 총 관객수 박스플롯
+# ----------------------------------------------------
+st.subheader("5. 주요 장르별 총 관객수 박스플롯")
+
+# 영화가 10편 이상인 장르만 필터링
+genre_counts_series = df['genre'].value_counts()
+major_genres = genre_counts_series[genre_counts_series >= 10].index.tolist()
+df_filtered_box = df[df['genre'].isin(major_genres)]
+
+fig_box = px.box(
+    df_filtered_box,
+    x='genre',
+    y='total_audi',
+    color='genre',
+    hover_name='movieNm',
+    points="outliers",  # 이상치(outliers) 점 표기
+    labels={
+        'genre': '장르',
+        'total_audi': '총 관객수 (명)'
+    },
+    title="영화 10편 이상 주요 장르별 총 관객수 분포 (박스플롯)"
+)
+
+fig_box.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>총 관객수: %{y:,.0f}명<extra></extra>"
+)
+
+fig_box.update_layout(
+    xaxis_title="장르 (10편 이상)",
+    yaxis_title="총 관객수 (명)",
+    showlegend=False
+)
+
+st.plotly_chart(fig_box, use_container_width=True)
+
+st.info("**이 그래프로 알 수 있는 것:** 주요 장르 간 관객수 중앙값과 분포 범위를 비교할 수 있으며, 상자 밖의 점을 통해 대흥행을 거둔 극단적인 이상치(Outlier) 영화들을 확인할 수 있습니다.")
