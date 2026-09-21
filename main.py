@@ -217,7 +217,7 @@ st.info("**이 그래프로 알 수 있는 것:** 주요 장르 간 관객수 �
 st.divider()
 
 # ----------------------------------------------------
-# 여섯 번째 그래프: 개봉일 스크린수 vs 총 관객수 (점 크기: 첫 주 관객수 버블 차트)
+# 여섯 번째 그래프: 개봉일 스크린수 vs 총 관객수 (버블 차트)
 # ----------------------------------------------------
 st.subheader("6. 개봉일 스크린수, 총 관객수, 첫 주 관객수 관계 (버블 차트)")
 
@@ -256,7 +256,6 @@ st.divider()
 # ----------------------------------------------------
 st.subheader("7. 제작 국가 및 장르별 영화 편수 (선버스트 차트)")
 
-# 국가 x 장르별 영화 편수 집계
 sunburst_df = df.groupby(['nation', 'genre']).size().reset_index(name='movie_count')
 
 fig_sunburst = px.sunburst(
@@ -274,3 +273,32 @@ fig_sunburst.update_traces(
 st.plotly_chart(fig_sunburst, use_container_width=True)
 
 st.info("**이 그래프로 알 수 있는 것:** 안쪽 고리의 국가를 클릭하면 해당 국가에서 제작된 장르별 영화 편수와 비중을 상세하게 탐색할 수 있습니다.")
+
+st.divider()
+
+# ----------------------------------------------------
+# 여덟 번째 그래프: 첫 일주일 관객수 vs 총 관객수 상관관계 산점도
+# ----------------------------------------------------
+st.subheader("8. 첫 일주일의 총 관객수와 얼마나 큰 상관관계가 있는지")
+
+fig_week_corr = px.scatter(
+    df,
+    x='first_week_audi',
+    y='total_audi',
+    color='genre',
+    hover_name='movieNm',
+    labels={
+        'first_week_audi': '첫 일주일 관객수 (명)',
+        'total_audi': '총 관객수 (명)',
+        'genre': '장르'
+    },
+    title="첫 일주일의 총 관객수와 얼마나 큰 상관관계가 있는지"
+)
+
+fig_week_corr.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>첫 일주일 관객수: %{x:,.0f}명<br>총 관객수: %{y:,.0f}명<extra></extra>"
+)
+
+st.plotly_chart(fig_week_corr, use_container_width=True)
+
+st.info("**이 그래프로 알 수 있는 것:** 첫 일주일 관객수가 높을수록 최종 총 관객수도 매우 높게 나타나는 강한 양의 선형 상관관계를 보여주며, 개봉 초반 흥행 성과가 전체 흥행을 좌우하는 핵심 지표임을 알 수 있습니다.")
