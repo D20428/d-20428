@@ -26,7 +26,7 @@ def load_data():
         df['nation'] = '기타'
     
     # 숫자형 컬럼 변환 (오류 문자열은 NaN 처리 후 0으로 대체)
-    for col in ['total_audi', 'first_scrn', 'first_week_audi']:
+    for col in ['total_audi', 'first_scrn', 'first_week_audi', 'show_days']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         else:
@@ -34,6 +34,15 @@ def load_data():
             
     # 관객수가 0 이하인 행 제거
     df = df[df['total_audi'] > 0].copy()
+    
+    # 하루 평균 관객수 계산 (상영일수가 있으면 사용, 없으면 첫 주 관객수/7로 계산)
+    if 'show_days' in df.columns and (df['show_days'] > 0).any():
+        df['daily_avg_audi'] = df.apply(
+            lambda r: r['total_audi'] / r['show_days'] if r['show_days'] > 0 else r['first_week_audi'] / 7,
+            axis=1
+        )
+    else:
+        df['daily_avg_audi'] = df['first_week_audi'] / 7
     
     return df
 
@@ -277,28 +286,28 @@ st.info("**이 그래프로 알 수 있는 것:** 안쪽 고리의 국가를 클
 st.divider()
 
 # ----------------------------------------------------
-# 여덟 번째 그래프: 첫 일주일 관객수 vs 총 관객수 상관관계 산점도
+# 여덟 번째 그래프: 하루 평균 관객수 vs 총 관객수 산점도
 # ----------------------------------------------------
-st.subheader("8. 첫 일주일의 총 관객수와 얼마나 큰 상관관계가 있는지")
+st.subheader("8. 하루 평균 관객수와 총 관객수 관계")
 
-fig_week_corr = px.scatter(
+fig_daily_avg = px.scatter(
     df,
-    x='first_week_audi',
+    x='daily_avg_audi',
     y='total_audi',
     color='genre',
     hover_name='movieNm',
     labels={
-        'first_week_audi': '첫 일주일 관객수 (명)',
+        'daily_avg_audi': '하루 평균 관객수 (명)',
         'total_audi': '총 관객수 (명)',
         'genre': '장르'
     },
-    title="첫 일주일의 총 관객수와 얼마나 큰 상관관계가 있는지"
+    title="하루 평균 관객수와 총 관객수 관계"
 )
 
-fig_week_corr.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>첫 일주일 관객수: %{x:,.0f}명<br>총 관객수: %{y:,.0f}명<extra></extra>"
+fig_daily_avg.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>하루 평균 관객수: %{x:,.0f}명<br>총 관객수: %{y:,.0f}명<extra></extra>"
 )
 
-st.plotly_chart(fig_week_corr, use_container_width=True)
+st.plotly_chart(fig_daily_avg, use_container_width=True)
 
-st.info("**이 그래프로 알 수 있는 것:** 첫 일주일 관객수가 높을수록 최종 총 관객수도 매우 높게 나타나는 강한 양의 선형 상관관계를 보여주며, 개봉 초반 흥행 성과가 전체 흥행을 좌우하는 핵심 지표임을 알 수 있습니다.")
+st.info("**이 그래프로 알 수 있는 것:** 하루 평균 집객 파워(일평균 관객수)가 높은 영화일수록 최종 누적 총 관객수도 크게 증가하는 밀접한 상관관계를 보여줍니다.")
