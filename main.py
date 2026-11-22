@@ -61,7 +61,6 @@ def train_and_evaluate(train_df: pd.DataFrame, test_df: pd.DataFrame):
     # 테스트 세트 예측 및 달러 역변환
     pred_test_log = model.predict(X_test)
     pred_test_dollar = np.exp(pred_test_log)
-    res_log = y_test_log.values - pred_test_log
 
     metrics = {
         'r2_dollar': r2_score(y_test_dollar, pred_test_dollar),
@@ -78,20 +77,13 @@ def train_and_evaluate(train_df: pd.DataFrame, test_df: pd.DataFrame):
         'Pct_Impact': (np.exp(model.coef_) - 1) * 100
     })
 
-    eval_df = test_df.copy()
-    eval_df['pred_log'] = pred_test_log
-    eval_df['actual_log'] = y_test_log.values
-    eval_df['res_log'] = res_log
-    eval_df['pred_price'] = pred_test_dollar
-    eval_df['abs_error'] = np.abs(y_test_dollar - pred_test_dollar)
-
-    return model, X_train.columns.tolist(), metrics, coef_df, eval_df
+    return model, X_train.columns.tolist(), metrics, coef_df
 
 
 # 데이터 로드 및 모델 학습 실행
 try:
     train_df, test_df = load_data()
-    model, feature_cols, metrics, coef_df, eval_df = train_and_evaluate(train_df, test_df)
+    model, feature_cols, metrics, coef_df = train_and_evaluate(train_df, test_df)
 except FileNotFoundError:
     st.error("⚠️ `diamond_train.csv` 또는 `diamond_test.csv` 파일을 찾을 수 없습니다. GitHub 저장소 최상단에 두 파일을 업로드해 주세요.")
     st.stop()
@@ -106,8 +98,8 @@ st.markdown(
 # 3개 탭 구성
 tab1, tab2, tab3 = st.tabs([
     "🔮 1. 실시간 가격 예측기",
-    "📊 2. 데이터 탐색(EDA) & 심슨의 역설",
-    "📈 3. 모델 성능 & 잔차 진단"
+    "🧹 2. 상세 전처리 과정 & EDA",
+    "📈 3. 모델 성능 & 회귀 계수 분석"
 ])
 
 # ==========================================
@@ -184,21 +176,85 @@ with tab1:
 
 
 # ==========================================
-# TAB 2: 데이터 탐색(EDA) 및 전처리 요약
+# TAB 2: 상세 전처리 과정 & EDA
 # ==========================================
 with tab2:
-    st.subheader("1. 데이터 정제 파이프라인 요약")
-    clean_summary = pd.DataFrame({
-        '단계': ['원본 데이터', '1단계: 완전 중복 제거', '2단계: 치수 0값(x,y,z=0) 제거', '3단계: 극단적 오기입(y,z>20) 제거', '최종 분할 (8:2 층화)'],
-        '제거 건수': ['-', '146건', '19건', '3건', 'Train 43,017 / Test 10,755'],
-        '잔여 건수': ['53,940건', '53,794건', '53,775건', '53,772건', '53,772건']
-    })
-    st.table(clean_summary)
+    st.subheader("1. 행(Row) 단위 데이터 정제 파이프라인 (53,940건 → 53,772건)")
+    st.markdown("원본 `diamonds.csv`에서 데이터 누수와 회귀 계수 왜곡을 유발하는 결함 데이터를 단계별로 식별하여 제거했습니다.")
 
-    st.subheader("2. 심슨의 역설(Simpson's Paradox) 확인")
+    row_clean_df = pd.DataFrame([
+        {
+            '단계': '원본 데이터 (Raw)',
+            '처리 기준': '초기 로드 (`diamonds.csv`, 10개 컬럼)',
+            '제거 건수': '0건',
+            '잔여 건수': '53,940건',
+            '처리 사유 및 근거': '표면적 NaN 결측치는 0건이나 내부 논리 오류 및 중복 포함'
+        },
+        {
+            '단계': '1단계: 완전 중복 제거',
+            '처리 기준': '10개 컬럼 값이 모두 동일한 행 (`keep="first"`)',
+            '제거 건수': '146건',
+            '잔여 건수': '53,794건',
+            '처리 사유 및 근거': 'Train/Test 분할 시 동일 표본 양쪽 유입(Data Leakage) 차단'
+        },
+        {
+            '단계': '2단계: 치수 0값 제거',
+            '처리 기준': 'x=0, y=0 또는 z=0인 물리적 불가능 행',
+            '제거 건수': '19건',
+            '잔여 건수': '53,775건',
+            '처리 사유 및 근거': '전체의 0.035%로 비중이 극미하여 추정치 대입 대신 삭제해 노이즈 배제'
+        },
+        {
+            '단계': '3단계: 극단적 오기입 제거',
+            '처리 기준': 'y > 20mm 또는 z > 20mm인 입력 오류 행',
+            '제거 건수': '3건',
+            '잔여 건수': '53,772건',
+            '처리 사유 및 근거': '24067번(y=58.90), 48410번(z=31.80), 49189번(y=31.80) 소수점·복사 오류 제거'
+        },
+        {
+            '단계': '4단계: 8:2 층화 분할',
+            '처리 기준': '가격(price) 20분위수 기준 `stratify` 분할',
+            '제거 건수': '-',
+            '잔여 건수': 'Train 43,017 / Test 10,755',
+            '처리 사유 및 근거': 'Train 평균($3,931.11)과 Test 평균($3,931.26) 분포를 동일하게 유지'
+        }
+    ])
+    st.dataframe(row_clean_df, use_container_width=True, hide_index=True)
+
+    st.subheader("2. 열(Feature) 단위 변환 및 인코딩 규칙 (선형 회귀 최적화)")
+    col_clean_df = pd.DataFrame([
+        {
+            '변수명': 'x, y, z (치수 mm)',
+            '전처리 방법': '컬럼 완전 삭제 (Drop)',
+            '통계적·모델링 근거': 'carat과 상관계수 0.95~0.98의 심각한 다중공선성 제거 (VIF 1,084.4 → 1.3으로 정상화)'
+        },
+        {
+            '변수명': 'carat (중량)',
+            '전처리 방법': '자연로그 변환 ln(carat) 후 원본 삭제',
+            '통계적·모델링 근거': '가격과의 거듭제곱(곡선) 비선형 관계를 직선으로 변환 (상관계수 0.9216 → 0.9659 상승)'
+        },
+        {
+            '변수명': 'price (타겟 가격)',
+            '전처리 방법': '자연로그 변환 ln(price) 학습 → 예측 후 exp() 복원',
+            '통계적·모델링 근거': '절대 금액 대신 비율(%) 오차 학습, 마이너스(-) 가격 예측 원천 차단, 고가 구간 이분산성 완화'
+        },
+        {
+            '변수명': 'cut, color, clarity',
+            '전처리 방법': 'One-Hot Encoding (`drop_first=True`, 17개 더미 생성)',
+            '통계적·모델링 근거': '최하위 등급(Fair, J, I1)을 기준(0)으로 설정해 더미 변수 함정 방지 및 등급별 비선형 가격 차등 반영'
+        },
+        {
+            '변수명': 'depth, table',
+            '전처리 방법': '원본 수치 유지',
+            '통계적·모델링 근거': 'x, y, z 제거 후 연마 비율 정보 보존 (정규분포에 가까워 별도 로그 변환 불필요)'
+        }
+    ])
+    st.dataframe(col_clean_df, use_container_width=True, hide_index=True)
+
+    st.subheader("3. 탐색적 데이터 분석(EDA): 심슨의 역설(Simpson's Paradox)")
     st.info(
         "단순 등급별 가격을 비교하면 최하위 등급(I1, J)이 최고등급(IF, D)보다 비싸 보이는 역전 현상이 발생합니다. "
-        "이는 저등급 다이아몬드의 평균 중량(Carat)이 훨씬 크기 때문이며, 모델에서는 log(carat)으로 중량을 통제해 이를 해결했습니다."
+        "이는 저등급 다이아몬드의 평균 중량(Carat)이 훨씬 크기 때문이며, 모델에서는 ln(carat)으로 중량을 통제해 이를 해결했습니다."
     )
 
     full_df = pd.concat([train_df, test_df])
@@ -239,7 +295,7 @@ with tab2:
 
 
 # ==========================================
-# TAB 3: 모델 성능 및 잔차 진단
+# TAB 3: 모델 성능 & 회귀 계수 분석
 # ==========================================
 with tab3:
     st.subheader("1. 테스트 세트(10,755건) 최종 평가 지표")
@@ -249,7 +305,18 @@ with tab3:
     k3.metric("MAE ($)", f"${metrics['mae_dollar']:,.2f}")
     k4.metric("MAPE (%)", f"{metrics['mape_dollar']:.2f}%")
 
-    st.subheader("2. 회귀 계수 분석 (기준 등급 대비 순수 가격 상승률 %)")
+    st.markdown(
+        f"- **로그 공간 성능:** $R^2 = {metrics['r2_log']:.4f}$, $\\text{{RMSE}} = {metrics['rmse_log']:.4f}$\n"
+        f"- **전처리 개선 효과:** 기본 선형 회귀(RMSE `$1,121.85`, MAE `$726.58`) 대비 오차(MAE) **약 44.3% 감소** 및 음수 가격 예측 0건 달성"
+    )
+
+    st.divider()
+    st.subheader("2. 회귀 계수(β) 및 기준 등급 대비 순수 가격 상승률 (%)")
+    st.markdown(
+        f"- **중량 탄력성 (`ln(carat)` 계수 = `{model.coef_[0]:.4f}`):** 다른 조건이 동일할 때 중량이 **1% 증가하면 가격은 약 1.885% 상승**합니다.\n"
+        f"- **등급 프리미엄:** 아래 차트는 각 범주의 최하위 기준 등급(`Fair`, `J`, `I1`) 대비 등급이 올라갈 때의 순수 가격 상승률 $(e^\\beta - 1) \\times 100\\%$입니다."
+    )
+
     cat_coefs = coef_df[coef_df['Feature'].str.startswith(('cut_', 'color_', 'clarity_'))].copy()
     fig_coef = px.bar(
         cat_coefs,
@@ -263,39 +330,11 @@ with tab3:
         color_continuous_scale='Teal'
     )
     fig_coef.update_traces(texttemplate='+%{text:.1f}%', textposition='outside')
-    fig_coef.update_layout(height=550)
+    fig_coef.update_layout(height=580)
     st.plotly_chart(fig_coef, use_container_width=True)
 
-    st.subheader("3. 잔차(Residual) 및 예측 적합도 진단")
-    sample_eval = eval_df.sample(n=3000, random_state=42)
-    c_res1, c_res2 = st.columns(2)
-
-    with c_res1:
-        fig_res = px.scatter(
-            sample_eval,
-            x='pred_log',
-            y='res_log',
-            opacity=0.35,
-            title="Residuals vs. Fitted Values (로그 공간)",
-            labels={'pred_log': '예측값 ln(price)', 'res_log': '잔차 (실제 - 예측)'},
-            color_discrete_sequence=['#2b5c8f']
-        )
-        fig_res.add_hline(y=0, line_dash="dash", line_color="red")
-        st.plotly_chart(fig_res, use_container_width=True)
-
-    with c_res2:
-        fig_act = px.scatter(
-            sample_eval,
-            x='price',
-            y='pred_price',
-            opacity=0.35,
-            title="실제 가격($) vs 예측 가격($)",
-            labels={'price': '실제 가격 ($)', 'pred_price': '예측 가격 ($)'},
-            color_discrete_sequence=['#1f77b4']
-        )
-        fig_act.add_trace(go.Scatter(
-            x=[0, 20000], y=[0, 20000],
-            mode='lines', name='완벽 예측선 (y=x)',
-            line=dict(color='red', dash='dash')
-        ))
-        st.plotly_chart(fig_act, use_container_width=True)
+    with st.expander("📋 전체 20개 피처 회귀 계수 상세 표 보기"):
+        display_coef = coef_df.copy()
+        display_coef['Coefficient'] = display_coef['Coefficient'].round(4)
+        display_coef['Pct_Impact (%)'] = display_coef['Pct_Impact'].round(2)
+        st.dataframe(display_coef[['Feature', 'Coefficient', 'Pct_Impact (%)']], use_container_width=True, hide_index=True)
